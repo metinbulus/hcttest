@@ -1,0 +1,11 @@
+citHeader("To cite hcttest in publications use:")
+bibentry(bibtype = "Manual",
+         title        = "Robust Standard Errors and Confidence Intervals for Standardized Mean Difference",
+         author       = as.person("Metin Bulus"),
+         note         = "Preprint",
+         year         = "2024",
+         url = "https://doi.org/10.31219/osf.io/k6mbs",
+         textVersion  =
+           paste("Bulus, M. (2024).",
+                 "Robust Standard Errors and Confidence Intervals for Standardized Mean Difference",
+                 "https://doi.org/10.31219/osf.io/k6mbs"))

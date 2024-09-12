@@ -1,0 +1,15 @@
+Package: hcttest
+Version: 0.0.0.9999
+Type: Package
+Title: Heteroscedasticity-Consistent (HC) T-test Procedures
+Authors@R: c(person("Metin", "Bulus", email = "bulusmetin@gmail.com", role = c("aut", "cre")))
+Date: 2024-09-24
+Description: Heteroscedasticity-consistent (HC) t-test procedures and standardized mean difference.
+Imports: sadists
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
+ByteCompile: yes
+LazyLoad: yes
+LazyData: yes
+License: file LICENSE
+Maintainer: Metin Bulus <bulusmetin@gmail.com>

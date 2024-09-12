@@ -1,0 +1,10 @@
+importFrom("stats", "as.formula", "qnorm", "pt", "qt", "sd")
+importFrom("sadists", "qlambdap")
+
+S3method(hc.t.test, default)
+S3method(hc.t.test, formula)
+
+export(hc.t.test)
+export(hc.t.test.default)
+export(hc.t.test.formula)
+export(smd.hc.t.test)
