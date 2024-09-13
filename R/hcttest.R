@@ -227,7 +227,7 @@ hc.t.test.default <- function(x = NULL, y = NULL,
     
     print(
       
-      round(test, 4)
+      round(test, 3)
       
     )
     
@@ -370,7 +370,7 @@ smd.hc.t.test <- function(x = NULL,
   
   if(verbose) {
     print(
-      round(es, 4)
+      round(es, 3)
     )
   }
   
