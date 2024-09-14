@@ -1,4 +1,13 @@
 # hcttest: Heteroscedasticity-Consistent (HC) T-test Procedures
+
+To install and load the package: 
+
+```{r, eval = FALSE}
+library(devtools) # for install_github() function
+install_github("metinbulus/hcttest")
+library(hcttest)
+```
+
 The {hcttest} package includes testing and standardization procedures for 
 - Student's t-test,
 - HC0 Sandwich Estimator (White. 1980),
