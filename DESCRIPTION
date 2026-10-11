@@ -1,0 +1,18 @@
+Package: hcttest
+Version: 0.0.0.9999
+Type: Package
+Title: Heteroscedasticity-Consistent (HC) T-test Procedures
+Authors@R: c(person("Metin", "Bulus", email = "bulusmetin@gmail.com", role = c("aut", "cre")))
+Date: 2026-10-02
+Description: Heteroscedasticity-consistent (HC) t-test procedures, trimmed
+    mean analyses, standardized mean differences, bootstrap inference, power
+    calculations and data generation with internal distribution helpers.
+Imports: stats, utils, graphics, grDevices, parallel, boot, KScorrect, extraDistr, metafor
+Suggests: knitr, rmarkdown, sandwich
+VignetteBuilder: knitr
+ByteCompile: yes
+License: file LICENSE
+Maintainer: Metin Bulus <bulusmetin@gmail.com>
+Encoding: UTF-8
+Roxygen: list(markdown = FALSE)
+RoxygenNote: 7.3.2

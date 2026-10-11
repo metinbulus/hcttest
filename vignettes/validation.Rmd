@@ -1,0 +1,498 @@
+---
+title: "Simple validation examples"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simple validation examples}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Each example below explains one comparison and prints a numeric table with
+package value, reference value, and their difference. Values near zero in the
+difference column indicate numerical agreement. All code runs directly here.
+There are no external validation files or test runners. Base R supplies the
+references, except for `sandwich` in the optional HC checks and the package's
+existing `boot` dependency. These checks establish agreement for the displayed
+examples, not coverage under all conditions. Knitting executes and prints the examples.
+
+The primary reference is Bulus (2026), especially Table 1 and Appendices A1-A2.
+Observation weighting is an implementation extension and is checked separately.
+
+```{r setup}
+library(hcttest)
+```
+
+## Student test: compare with t.test()
+
+Use the same two groups in the remaining mean-difference comparisons. The
+constant-variance result should match base R's equal-variance t test.
+
+```{r student}
+x <- c(1, 2, 4, 5, 8, 10)
+y <- c(0, 3, 4, 6, 7, 9, 11, 14)
+fit <- hct.test(x, y, method = "student", verbose = FALSE)
+reference <- t.test(x, y, var.equal = TRUE)
+comparison <- data.frame(
+  metric = c("Difference", "SE", "t", "df", "p", "Lower", "Upper"),
+  package = unlist(fit$test[1, c("delta", "se", "t", "df", "p", "lcl", "ucl")], use.names = FALSE),
+  reference = c(mean(x)-mean(y), reference$stderr, unname(reference$statistic),
+                unname(reference$parameter), reference$p.value, reference$conf.int))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Welch test: compare with t.test()
+
+Here the SE allows unequal group variances, and the df use Welch-Satterthwaite.
+
+```{r welch}
+fit <- hct.test(x, y, method = "hc2", df = "welch-satterthwaite", verbose = FALSE)
+reference <- t.test(x, y)
+comparison <- data.frame(
+  metric = c("SE", "t", "df", "p"),
+  package = unlist(fit$test[1, c("se", "t", "df", "p")], use.names = FALSE),
+  reference = c(reference$stderr, unname(reference$statistic),
+                unname(reference$parameter), reference$p.value))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Per-observation weights: compare Student SE with lm()
+
+`weights` is a weight for each observation. The separate `mixnorm.weight`
+argument in summary-distribution calculations refers to mixture proportions.
+The indicator is one for the first group, keeping the difference x minus y.
+
+```{r weighted-student}
+dat <- data.frame(value = c(x, y), first = c(rep(1, length(x)), rep(0, length(y))),
+                  w = c(1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2, 1, 2, 1))
+model <- lm(value ~ first, data = dat, weights = w)
+fit <- hct.test(x, y, weights = dat$w, method = "student", verbose = FALSE)
+comparison <- data.frame(
+  metric = c("Difference", "SE"),
+  package = c(fit$test$delta, fit$test$se),
+  reference = c(unname(coef(model)["first"]), sqrt(vcov(model)["first", "first"])))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## HC reference comparisons
+
+The next checks use the same weighted data and model. Each compares one HC SE
+with `sandwich::vcovHC()`, without introducing a new variance formula. If the
+suggested package sandwich is absent, that comparison is explicitly skipped;
+install it and knit again to run the check. Successful Student/Welch checks do
+not imply these skipped comparisons passed.
+
+### HC0
+
+HC0 uses the unadjusted squared residual scores.
+
+```{r hc0}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc0", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC0")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC0 comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC1
+
+HC1 applies the sample-size adjustment.
+
+```{r hc1}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc1", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC1")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC1 comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC2
+
+HC2 adjusts residuals for leverage.
+
+```{r hc2}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc2", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC2")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC2 comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC3
+
+HC3 uses the stronger leverage correction.
+
+```{r hc3}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc3", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC3")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC3 comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC4
+
+HC4 uses an adaptive leverage exponent.
+
+```{r hc4}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc4", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC4")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC4 comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC4m
+
+HC4m uses the modified adaptive exponent.
+
+```{r hc4m}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc4m", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC4m")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC4m comparison skipped: install sandwich to run it.")
+}
+```
+
+### HC5
+
+HC5 uses the HC5 high-leverage correction.
+
+```{r hc5}
+if (requireNamespace("sandwich", quietly = TRUE)) {
+  fit <- hct.test(x, y, weights = dat$w, method = "hc5", verbose = FALSE)
+  reference_se <- sqrt(sandwich::vcovHC(model, type = "HC5")["first", "first"])
+  comparison <- data.frame(
+    metric = "SE",
+    package = fit$test$se,
+    reference = reference_se)
+  comparison$difference <- comparison$package - comparison$reference
+  print(comparison, row.names = FALSE)
+} else {
+  message("HC5 comparison skipped: install sandwich to run it.")
+}
+```
+
+## Normal-approximation raw p value
+
+When ci = "z", the two-sided p value is twice the upper standard-normal tail
+of abs(delta/SE). This uses the same SE as the raw normal interval.
+
+```{r z-raw}
+fit <- hct.test(x, y, method = "hc3", ci = "z", verbose = FALSE)
+reference_p <- 2 * pnorm(abs(fit$test$delta / fit$test$se), lower.tail = FALSE)
+comparison <- data.frame(
+  metric = "Normal p",
+  package = fit$test$p,
+  reference = reference_p)
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Standardized difference and its normal p value
+
+Check the effect-size point estimate against the manually pooled SD. The SMD
+normal test uses d divided by its own SE, so it need not equal the raw p value.
+This example does not independently validate the SMD SE approximation.
+
+```{r smd}
+fit <- hct.test(x, y, method = "hc3", verbose = FALSE)
+smd <- robust.smd(fit, ci = "z", verbose = FALSE)
+pooled_sd <- sqrt(((length(x) - 1) * var(x) + (length(y) - 1) * var(y)) /
+                  (length(x) + length(y) - 2))
+reference_d <- (mean(x) - mean(y)) / pooled_sd
+reference_p <- 2 * pnorm(abs(smd$es$d / smd$es$se), lower.tail = FALSE)
+comparison <- data.frame(
+  metric = c("d", "Normal p"),
+  package = c(smd$es$d, smd$es$p),
+  reference = c(reference_d, reference_p))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Unweighted trimming: compare the retained mean with base R
+
+The existing convention removes round(n * trim) observations from each tail.
+Here ten observations with trim = 0.1 retain values 2 through 9.
+
+```{r trimming}
+fit <- hct.test(1:10, 3:12, trim = 0.1, verbose = FALSE)
+comparison <- data.frame(
+  metric = c("Trimmed mean", "Retained n"),
+  package = c(fit$parms$m1, fit$parms$n1),
+  reference = c(mean(2:9), length(2:9)))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## g-and-h generation: check the transformation directly
+
+The normal draws are sample-standardized, transformed, and rescaled to preserve
+their realized sample mean and SD. With nonzero shapes this sample calibration
+introduces dependence within a sample; it is not an analytically calibrated
+independent population generator. Shapes are only accepted with a normal base.
+
+```{r g-and-h}
+set.seed(12)
+normal <- gendat.hct.test(0, 0.5, 1, 2, 40, 60)
+set.seed(12)
+shaped <- gendat.hct.test(0, 0.5, 1, 2, 40, 60, norm.transform.g = 0.3, norm.tranform.h = 0.1)
+z <- (normal$y1 - mean(normal$y1)) / sd(normal$y1)
+t <- expm1(0.3 * z) / 0.3 * exp(0.1 * z^2 / 2)
+reference <- mean(normal$y1) + sd(normal$y1) * (t - mean(t)) / sd(t)
+comparison <- data.frame(
+  metric = c("Value 1", "Value 2", "Mean", "SD"),
+  package = c(shaped$y1[1:2], mean(shaped$y1), sd(shaped$y1)),
+  reference = c(reference[1:2], mean(normal$y1), sd(normal$y1)))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Study rows: compare with a direct calculation
+
+The helper should reproduce a direct calculation for each study. We compare the
+estimate and its variance. The SMD normal p value is checked separately above.
+No pooled model is fitted.
+
+```{r study-table}
+studies <- data.frame(m1 = c(1, 2), m2 = c(0.5, 1.5), sd1 = c(1, 1.2),
+                      sd2 = c(1.1, 1.5), n1 = c(30, 40), n2 = c(35, 45))
+results <- meta.robust.smd(studies, method = "hc2", ci = "z", pool = FALSE)
+fit <- hct.test(m1 = 1, m2 = 0.5, sd1 = 1, sd2 = 1.1, n1 = 30, n2 = 35,
+                method = "hc2", verbose = FALSE)
+direct <- robust.smd(fit, ci = "z", verbose = FALSE)
+comparison <- data.frame(
+  metric = c("Effect", "Variance"),
+  package = c(results$yi[1], results$vi[1]),
+  reference = c(direct$es$d, direct$es$se^2))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Multiple outcomes: compare one row with a direct analysis
+
+Outcome-specific missing-data removal can give different analyzed sample sizes.
+Rows remain separate; no multiple-testing adjustment or covariance model is added.
+
+```{r multiple-outcomes}
+participants <- data.frame(group = factor(rep(c("A", "B"), c(6, 8))),
+                           outcome1 = c(x, y), outcome2 = c(x, y) * 2)
+participants$outcome2[1] <- NA_real_
+results <- multi.robust.smd(participants, c("outcome1", "outcome2"), "group",
+                            method = "hc3", na.rm = TRUE, ci = "z")
+fit <- hct.test(x, y, method = "hc3", verbose = FALSE)
+direct <- robust.smd(fit, ci = "z", verbose = FALSE)
+comparison <- data.frame(
+  metric = c("Outcome 1 effect", "Outcome 1 variance", "Outcome 2 first-group n"),
+  package = c(results$yi[1], results$vi[1], results$n1[2]),
+  reference = c(direct$es$d, direct$es$se^2, sum(!is.na(participants$outcome2[participants$group == "A"]))))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Ordinary bootstrap: compare with boot()
+
+Use the same seed, group strata, and simple pooled-SD statistic in both calls.
+This validates resampling and the resulting SEs for an untrimmed example; it is
+not a coverage study. A small replicate count keeps the example quick.
+
+```{r bootstrap}
+set.seed(20)
+bdat <- data.frame(y = c(rnorm(30), rnorm(40, 0.5)),
+                   group = factor(rep(c("A", "B"), c(30, 40))))
+statistic <- function(data, indices) {
+  sample <- data[indices, ]
+  a <- sample$y[sample$group == "A"]
+  b <- sample$y[sample$group == "B"]
+  pooled <- sqrt(((length(a)-1)*var(a) + (length(b)-1)*var(b)) /
+                 (length(a)+length(b)-2))
+  c(mean(a)-mean(b), (mean(a)-mean(b))/pooled)
+}
+set.seed(21)
+reference <- boot::boot(bdat, statistic, R = 199, strata = bdat$group)
+set.seed(21)
+result <- boot.hct.test(y ~ group, bdat, boot.rep = 199, parallel = "no",
+                        ncpus = 1, verbose = FALSE)
+comparison <- data.frame(
+  metric = c("Observed difference", "Observed d", "Difference SE", "d SE"),
+  package = c(result$est.data, result$se.boot),
+  reference = c(reference$t0, apply(reference$t, 2, sd)))
+comparison$difference <- comparison$package - comparison$reference
+print(comparison, row.names = FALSE)
+```
+
+## Power: compare with the noncentral t distribution
+
+The noncentrality, df, alpha, and tail convention are specified directly; this
+checks the calculation rather than interpreting observed power as prospective.
+
+```{r power}
+# With 30 observations per group, this planned effect gives ncp = 2.
+fit <- power.hct.test(
+  d = 2 * sqrt(2 / 30),
+  n2 = 30,
+  method = "constant",
+  claim.basis = "md.pval",
+  test.distribution = "t",
+  verbose = 0
+)
+
+critical <- qt(0.975, df = 58)
+reference <- pt(-critical, df = 58, ncp = 2) +
+  pt(critical, df = 58, ncp = 2, lower.tail = FALSE)
+
+print(data.frame(
+  metric = "Power",
+  package = fit$power,
+  reference = reference,
+  difference = fit$power - reference
+), row.names = FALSE)
+```
+
+## Scope and reference
+
+The companion study-tables vignette preserves the supplied 29-row dataset and
+shows unnormalized inverse-variance weights calculated from our current formulas.
+These examples do not externally validate weighted SMD variances or establish
+bootstrap coverage.
+Unsupported analytical weighted trimming remains disabled. Internal Lambda-prime
+helpers are not part of the public interface.
+
+Bulus, M. (2026). Robust standard errors and confidence intervals for standardized
+mean difference. *Research Synthesis Methods*. Advance online publication.
+
+## Plot confidence intervals
+
+The following comparisons check that the plotted SMD bands match direct
+robust.smd calculations at alpha = 0.05 and alpha = 0.01. The summaries,
+small-sample correction and scaling settings are identical. Plot output is
+returned invisibly as a data frame; each table reports numbers and differences.
+
+### Normal plot bands
+
+```{r plot-bands-z, fig.show='hide'}
+fit95 <- hct.test(m1 = 0.5, m2 = 0, sd1 = 1, sd2 = 1.4,
+                   n1 = 35, n2 = 45, method = "hc2",
+                   alpha = 0.05, verbose = FALSE)
+fit99 <- fit95
+fit99$parms$alpha <- 0.01
+smd95 <- robust.smd(fit95, ci = "z", ss.adjust = TRUE, verbose = FALSE)
+smd99 <- robust.smd(fit99, ci = "z", ss.adjust = TRUE, verbose = FALSE)
+bands <- plot(smd95, pretty = TRUE)
+reference <- c(smd95$es$lcl, smd95$es$ucl, smd99$es$lcl, smd99$es$ucl)
+plotted <- unlist(bands[c("lower95", "upper95", "lower99", "upper99")],
+                  use.names = FALSE)
+data.frame(limit = c("95 lower", "95 upper", "99 lower", "99 upper"),
+           plotted = plotted, reference = reference,
+           difference = plotted - reference)
+```
+
+### Central-t plot bands
+
+```{r plot-bands-ct, fig.show='hide'}
+fit95 <- hct.test(m1 = 0.5, m2 = 0, sd1 = 1, sd2 = 1.4,
+                   n1 = 35, n2 = 45, method = "hc2",
+                   alpha = 0.05, verbose = FALSE)
+fit99 <- fit95
+fit99$parms$alpha <- 0.01
+smd95 <- robust.smd(fit95, ci = "ct", ss.adjust = TRUE, verbose = FALSE)
+smd99 <- robust.smd(fit99, ci = "ct", ss.adjust = TRUE, verbose = FALSE)
+bands <- plot(smd95, pretty = TRUE)
+reference <- c(smd95$es$lcl, smd95$es$ucl, smd99$es$lcl, smd99$es$ucl)
+plotted <- unlist(bands[c("lower95", "upper95", "lower99", "upper99")],
+                  use.names = FALSE)
+data.frame(limit = c("95 lower", "95 upper", "99 lower", "99 upper"),
+           plotted = plotted, reference = reference,
+           difference = plotted - reference)
+```
+
+### Noncentral-t plot bands
+
+```{r plot-bands-nct, fig.show='hide'}
+fit95 <- hct.test(m1 = 0.5, m2 = 0, sd1 = 1, sd2 = 1.4,
+                   n1 = 35, n2 = 45, method = "hc2",
+                   alpha = 0.05, verbose = FALSE)
+fit99 <- fit95
+fit99$parms$alpha <- 0.01
+smd95 <- robust.smd(fit95, ci = "nct", ss.adjust = TRUE, verbose = FALSE)
+smd99 <- robust.smd(fit99, ci = "nct", ss.adjust = TRUE, verbose = FALSE)
+bands <- plot(smd95, pretty = TRUE)
+reference <- c(smd95$es$lcl, smd95$es$ucl, smd99$es$lcl, smd99$es$ucl)
+plotted <- unlist(bands[c("lower95", "upper95", "lower99", "upper99")],
+                  use.names = FALSE)
+data.frame(limit = c("95 lower", "95 upper", "99 lower", "99 upper"),
+           plotted = plotted, reference = reference,
+           difference = plotted - reference)
+```
+
+
+### Bootstrap replay at alpha = 0.01
+
+This comparison reruns the original bootstrap at alpha = 0.01, using the
+same data, arguments and starting seed. The plot performs the same replay
+internally. Its 99 percent percentile limits should match the direct call.
+
+```{r bootstrap-plot-replay, fig.show='hide'}
+replay.data <- data.frame(
+  group = factor(rep(c("A", "B"), each = 30)),
+  outcome = c(seq(-1.3, 1.7, length.out = 30),
+              seq(-1.2, 1.6, length.out = 30)))
+set.seed(2026)
+original.boot <- boot.hct.test(outcome ~ group, data = replay.data,
+                               alpha = 0.05, boot.rep = 999,
+                               parallel = "no", ncpus = 1, verbose = FALSE)
+plotted.boot <- plot(original.boot, pretty = TRUE, boot.ci = "percentile")
+set.seed(2026)
+direct.boot99 <- boot.hct.test(outcome ~ group, data = replay.data,
+                               alpha = 0.01, boot.rep = 999,
+                               parallel = "no", ncpus = 1, verbose = FALSE)
+index <- which(direct.boot99$est.type == "Standardized")
+reference <- c(direct.boot99$lcl.boot.perc[index], direct.boot99$ucl.boot.perc[index])
+plotted <- c(plotted.boot$lower99, plotted.boot$upper99)
+data.frame(limit = c("99 lower", "99 upper"), plotted = plotted,
+           reference = reference, difference = plotted - reference)
+```

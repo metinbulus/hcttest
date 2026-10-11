@@ -1,0 +1,136 @@
+---
+title: "Study-level robust standardized differences"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Study-level robust standardized differences}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup}
+library(hcttest)
+```
+
+## Study summaries
+
+The earlier proof of Bulus (2026), Table 3, reanalyzes data from Zhang et al. (2023). The supplied
+29-row dataset transcribes the displayed rounded group summaries. The first
+group is sexual minority families; the second is heterosexual families. The
+source image notes that the underlying data were reproduced under CC BY-NC.
+
+```{r summaries}
+studies <- readRDS(system.file("extdata", "table3-studies.rds", package = "hcttest"))
+summary_table <- studies[, c("study", "n1", "m1", "sd1", "n2", "m2", "sd2")]
+names(summary_table) <- c("Study - subgroup", "SM n", "SM mean", "SM SD",
+                          "Heterosexual n", "Heterosexual mean", "Heterosexual SD")
+print(summary_table, row.names = FALSE)
+```
+
+## Effect sizes and inverse-variance weights
+
+The batch function returns yi (the standardized estimate) and vi (its squared
+reported SE). It does not calculate normalized weights or percentages. Here we
+calculate the weights directly as:
+
+\[
+  w_i = 1/v_i.
+\]
+
+These are unnormalized fixed-effect inverse-variance weights. Their sum is not
+constrained; the batch function now also fits REML pooled models by default through metafor.
+The constant and HC2 calculations use explicitly selected regression df,
+central-t intervals, and the existing small-sample correction.
+
+```{r calculate}
+constant <- meta.robust.smd(studies, study = "study", method = "constant",
+                            df = "regression", ss.adjust = TRUE, ci = "ct")
+hc2 <- meta.robust.smd(studies, study = "study", method = "hc2",
+                       df = "regression", ss.adjust = TRUE, ci = "ct")
+results <- data.frame(
+  study = studies$study,
+  g = constant$yi,
+  constant_lower = constant$lcl,
+  constant_upper = constant$ucl,
+  constant_weight = 1 / constant$vi,
+  hc2_lower = hc2$lcl,
+  hc2_upper = hc2$ucl,
+  hc2_weight = 1 / hc2$vi)
+print(results, row.names = FALSE)
+```
+
+Reported normalized weights from the source image remain in the dataset for
+provenance but are not displayed or compared here. They cannot determine the
+absolute unnormalized weights without the original normalization total. The
+numbers above use our current formulas and selected settings; they are not a
+claim of exact reproduction of the paper's reported analysis.
+
+Several rows come from the same named study. This vignette computes separate
+study/outcome effects and weights. Its default pooled fit assumes independent rows, without a covariance model.
+Theoretical context is in the paper's Method section, Table 1, Appendix A2,
+and Implications for Meta-Analysis. Weighted SMD SE approximations and the
+current implementation still require their own validation.
+
+## Reference
+
+Bulus, M. (2026). Robust standard errors and confidence intervals for standardized
+mean difference. *Research Synthesis Methods*. Advance online publication.
+
+## Plotting study estimates
+
+Both styles use the same default x-axis range. The ordinary plot uses the
+stored effect-size intervals. The shaded plot uses 95% and 99% bands from the fitted central-t method
+and its fitted degrees of freedom.
+Study names are retained on the left.
+
+```{r study-plots, fig.width=8, fig.height=9}
+plot(hc2, margins = c(-0.2, 0.2), main = "HC2 study estimates")
+plot(hc2, pretty = TRUE, margins = c(-0.2, 0.2),
+     main = "HC2 study estimates", label.padding = 1)
+```
+
+The two variance methods can also be displayed together. Rows match by study
+name; colors identify the methods. Both plots preserve the fitted central-t
+interval method. The two estimates appear above and below each study label.
+
+```{r compare-study-plots, fig.width=8, fig.height=9}
+plot(constant, hc2, pretty = TRUE, col = c("navy", "darkorange3"),
+     margins = c(-0.2, 0.2), main = "Constant and HC2 estimates")
+legend("bottomright", legend = c("Constant", "HC2"),
+       col = c("navy", "darkorange3"), lwd = 3, bty = "n")
+```
+
+## Pooled estimates
+
+The pooled attribute reports raw and standardized summaries. The model choice
+can affect both heterogeneity and the pooled point estimate. Lines in each
+model color mark its pooled effect in the study plots.
+
+```{r pooled-estimates}
+print(attr(constant, "pooled"), row.names = FALSE)
+print(attr(hc2, "pooled"), row.names = FALSE)
+```
+
+## Multiple outcomes within one study
+
+Analyze and display each outcome separately. No pooled effect is calculated
+across outcomes measured on the same people.
+
+```{r multiple-outcomes, fig.width=8, fig.height=6}
+dat <- subset(iris, Species != "virginica")
+outcomes <- c("Sepal.Length", "Sepal.Width", "Petal.Length", "Petal.Width")
+constant.multi <- multi.robust.smd(dat, outcomes, "Species", method = "constant",
+                                  ci = "ct")
+hc2.multi <- multi.robust.smd(dat, outcomes, "Species", method = "hc2", ci = "ct")
+print(constant.multi[, c("outcome", "yi", "se", "lcl.equivalence", "ucl.equivalence")],
+      row.names = FALSE)
+print(hc2.multi[, c("outcome", "yi", "se", "lcl.equivalence", "ucl.equivalence")],
+      row.names = FALSE)
+plot(constant.multi, hc2.multi, pretty = TRUE,
+     col = c("#001F3F", "#B35400"))
+```
+
+SMD equivalence intervals and bound tests inherit `ci = "z"`, `"ct"`, or
+`"nct"`. At `alpha = 0.05`, individual outcome rows show 90% equivalence
+intervals, with ribbon fading to 95%. Raw-difference equivalence uses central-t
+inference. The default reference is zero. Meta-analysis plots continue to show
+their fitted metafor pooled summaries below the tick labels.

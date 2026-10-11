@@ -1,0 +1,9 @@
+bibentry(
+  bibtype = "Article",
+  title = "Robust standard errors and confidence intervals for standardized mean difference",
+  author = person(given = "Metin", family = "Bulus"),
+  journal = "Research Synthesis Methods",
+  year = "2026",
+  note = "Advance online publication.",
+  textVersion = "Bulus, M. (2026). Robust standard errors and confidence intervals for standardized mean difference. Research Synthesis Methods. Advance online publication."
+)
