@@ -11,12 +11,13 @@ gendat.hct.test(
   sd2,
   n1,
   n2,
-  wt = 0.5,
+  mixnorm.weights = 0.5,
+  group.levels = c("Group 1", "Group 2"),
   format = c("list.y", "data", "list.yx"),
   distribution = c("norm", "mixnorm", "lnorm", "uni", "exp", "pois", "negbin", "betabin"),
   betabin.size = ceiling(max(mu1, mu2) + 3 * max(sd1, sd2)),
   norm.transform.g = NULL,
-  norm.tranform.h = NULL
+  norm.transform.h = NULL
 )
 }
 \arguments{
@@ -26,15 +27,15 @@ gendat.hct.test(
 
 \item{n1, n2}{Group sample sizes.}
 
-\item{wt}{Mixture-normal component proportions.}
+\item{mixnorm.weights}{Mixture-normal component proportions.}
 
 \item{format}{Return two outcome vectors, a data frame, or outcomes and group indicators.}
 
-\item{distribution}{Generating distribution; norm or its alias normal is required when norm.transform.g or norm.tranform.h is supplied.}
+\item{distribution}{Generating distribution; norm or its alias normal is required when norm.transform.g or norm.transform.h is supplied.}
 
 \item{betabin.size}{Number of items for beta-binomial generation.}
 
-\item{norm.transform.g, norm.tranform.h}{Optional g-and-h shape parameters: a scalar for both groups or a pair of group values. Omitted parameters are zero. norm.tranform.h must be nonnegative.}
+\item{norm.transform.g, norm.transform.h}{Optional g-and-h shape parameters: a scalar for both groups or a pair of group values. Omitted parameters are zero. norm.transform.h must be nonnegative.}
 }
 \value{
 A list of group vectors or a data frame, according to format.
@@ -43,12 +44,12 @@ A list of group vectors or a data frame, according to format.
 Generate two-group data.
 }
 \details{
-Distribution-specific parameter constraints apply. Exponential and Poisson draws are shifted to obtain the requested mean; uniform endpoints are obtained from the mean and SD. Normal mixtures use component parameters rather than overall moments. When norm.transform.g or norm.tranform.h is supplied, normal draws are standardized by their sample moments, transformed as expm1(g*z)/g times exp(h*z^2/2) (using z when g is zero), and rescaled to preserve the original normal draws' realized sample mean and SD. This sample calibration creates dependent observations within each transformed sample; it is a simulation convention rather than independent draws with analytically calibrated population moments. Zero g and h reproduce the original normal draws exactly. At least two observations per group are required; extreme parameters that produce nonfinite scales raise an error. This function has no observation-weight argument.
+Distribution-specific parameter constraints apply. Exponential and Poisson draws are shifted to obtain the requested mean; uniform endpoints are obtained from the mean and SD. Normal mixtures use component parameters rather than overall moments. When norm.transform.g or norm.transform.h is supplied, normal draws are standardized by their sample moments, transformed as expm1(g*z)/g times exp(h*z^2/2) (using z when g is zero), and rescaled to preserve the original normal draws' realized sample mean and SD. This sample calibration creates dependent observations within each transformed sample; it is a simulation convention rather than independent draws with analytically calibrated population moments. Zero g and h reproduce the original normal draws exactly. At least two observations per group are required; extreme parameters that produce nonfinite scales raise an error. This function has no observation-weight argument.
 }
 \examples{
 set.seed(2)
 gendat.hct.test(0, 0.5, 1, 2, 30, 40, distribution = "norm",
-                norm.transform.g = c(0, 0.3), norm.tranform.h = 0.1)
+                norm.transform.g = c(0, 0.3), norm.transform.h = 0.1)
 
 set.seed(1)
 gendat.hct.test(mu1 = 0, mu2 = 0.5, sd1 = 1, sd2 = 2, n1 = 20, n2 = 30)

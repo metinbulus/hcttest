@@ -768,18 +768,19 @@ hct.test.default <- function(x = NULL, y = NULL,
                              # distribution is needed when trim > 0 and m1, m2, sd1, and sd2 are provided
                              trim = 0, na.rm = FALSE, weights = NULL,
                              distribution = c("norm", "norm"), # or "mixnorm", "pois", "exp", "uni", "lnorm" # to get pop diff and sd
-                             mixnorm.weight = 0.50, # mixture proportions
+                             mixnorm.weights = 0.50, # mixture proportions
                              betabin.size = 20, # beta-binomial size
-                             norm.transform.g = NULL, norm.tranform.h = NULL,
+                             norm.transform.g = NULL, 
+                             norm.transform.h = NULL,
                              verbose = TRUE, ...) { 
   
   analysis <- .record_analysis("hct.test.default", match.call(), environment())
 
   # Local names used by internal distribution helpers.
-  weight <- mixnorm.weight
+  weight <- mixnorm.weights
   size <- betabin.size
   g <- norm.transform.g
-  h <- norm.tranform.h
+  h <- norm.transform.h
 
   method <- match.arg(method)
   # distribution <- match.arg(distribution)
@@ -907,7 +908,7 @@ hct.test.default <- function(x = NULL, y = NULL,
         
         stop("Invalid argument combination. You must specify only ONE of the following two options:\n",
              "  1. The 'distribution' argument (e.g., 'normal'), OR\n",
-             "  2. BOTH 'norm.transform.g' and 'norm.tranform.h' arguments.")
+             "  2. BOTH 'norm.transform.g' and 'norm.transform.h' arguments.")
         
       } # use.method
         
@@ -1251,7 +1252,7 @@ hct.test.formula <- function(formula, data, weights = NULL, ...) {
 #' @param m1,m2 Group means for summary-data analysis; vectors of component means for mixture summaries.
 #' @param sd1,sd2 Group SDs, or component SDs for mixture summaries.
 #' @param n1,n2 Group sample sizes for summary-data analysis.
-#' @param mixnorm.weight Mixture-component proportions for summary-data distributions; distinct from observation weights.
+#' @param mixnorm.weights Mixture-component proportions for summary-data distributions; distinct from observation weights.
 #' @param alpha Significance level.
 #' @param verbose Logical; print results.
 #' @param two.tailed Logical; use a two-sided test. One-sided tests use the magnitude of the observed difference.
@@ -1263,7 +1264,7 @@ hct.test.formula <- function(formula, data, weights = NULL, ...) {
 #' @param na.rm Logical; remove incomplete observations. Weighted observations and their weights are removed together.
 #' @param weights Observation weights for raw data only. Supply a concatenated vector for x then y, or list(x = ..., y = ...). The formula method accepts a data column expression or a numeric vector aligned with data.
 #' @param distribution Two group distributions used for trimmed summary-data calculations.
-#' @param norm.transform.g,norm.tranform.h Optional g-and-h parameters for summary-data moment calculations.
+#' @param norm.transform.g,norm.transform.h Optional g-and-h parameters for summary-data moment calculations.
 #' @param formula A formula of the form outcome ~ group.
 #' @param data Data frame containing outcome and group; exactly two observed groups are required.
 #' @param ... Additional arguments passed from the formula method to the default method.
@@ -1477,19 +1478,19 @@ robust.smd <- function(x = NULL,
 #' @param mu1,mu2 Target means; component means for mixture normals.
 #' @param sd1,sd2 Target SDs; component SDs for mixture normals.
 #' @param n1,n2 Group sample sizes.
-#' @param wt Mixture-normal component proportions.
+#' @param mixnorm.weights Mixture-normal component proportions.
 #' @param betabin.size Number of items for beta-binomial generation.
 #' @param format Return two outcome vectors, a data frame, or outcomes and group indicators.
-#' @param distribution Generating distribution; norm or its alias normal is required when norm.transform.g or norm.tranform.h is supplied.
-#' @param norm.transform.g,norm.tranform.h Optional g-and-h shape parameters: a scalar for both groups or a pair of group values. Omitted parameters are zero. norm.tranform.h must be nonnegative.
+#' @param distribution Generating distribution; norm or its alias normal is required when norm.transform.g or norm.transform.h is supplied.
+#' @param norm.transform.g,norm.transform.h Optional g-and-h shape parameters: a scalar for both groups or a pair of group values. Omitted parameters are zero. norm.transform.h must be nonnegative.
 #'
-#' @details Distribution-specific parameter constraints apply. Exponential and Poisson draws are shifted to obtain the requested mean; uniform endpoints are obtained from the mean and SD. Normal mixtures use component parameters rather than overall moments. When norm.transform.g or norm.tranform.h is supplied, normal draws are standardized by their sample moments, transformed as expm1(g*z)/g times exp(h*z^2/2) (using z when g is zero), and rescaled to preserve the original normal draws' realized sample mean and SD. This sample calibration creates dependent observations within each transformed sample; it is a simulation convention rather than independent draws with analytically calibrated population moments. Zero g and h reproduce the original normal draws exactly. At least two observations per group are required; extreme parameters that produce nonfinite scales raise an error. This function has no observation-weight argument.
+#' @details Distribution-specific parameter constraints apply. Exponential and Poisson draws are shifted to obtain the requested mean; uniform endpoints are obtained from the mean and SD. Normal mixtures use component parameters rather than overall moments. When norm.transform.g or norm.transform.h is supplied, normal draws are standardized by their sample moments, transformed as expm1(g*z)/g times exp(h*z^2/2) (using z when g is zero), and rescaled to preserve the original normal draws' realized sample mean and SD. This sample calibration creates dependent observations within each transformed sample; it is a simulation convention rather than independent draws with analytically calibrated population moments. Zero g and h reproduce the original normal draws exactly. At least two observations per group are required; extreme parameters that produce nonfinite scales raise an error. This function has no observation-weight argument.
 #'
 #' @return A list of group vectors or a data frame, according to format.
 #'
 #' @examples set.seed(2)
 #' gendat.hct.test(0, 0.5, 1, 2, 30, 40, distribution = "norm",
-#'                 norm.transform.g = c(0, 0.3), norm.tranform.h = 0.1)
+#'                 norm.transform.g = c(0, 0.3), norm.transform.h = 0.1)
 #'
 #' set.seed(1)
 #' gendat.hct.test(mu1 = 0, mu2 = 0.5, sd1 = 1, sd2 = 2, n1 = 20, n2 = 30)
@@ -1501,15 +1502,23 @@ robust.smd <- function(x = NULL,
 #' @rdname gendat.hct.test
 #' @export gendat.hct.test
 gendat.hct.test <- function(mu1, mu2, sd1, sd2, n1, n2, 
-                            wt = 0.50, # for mixture normal
+                            mixnorm.weights = 0.50, # for mixture normal
+                            group.levels = c("Group 1", "Group 2"),
                             format = c("list.y", "data", "list.yx"),
                             distribution = c("norm", "mixnorm", "lnorm", "uni", "exp", "pois", "negbin", "betabin"),
                             betabin.size = ceiling(max(mu1, mu2) + 3 * max(sd1, sd2)),
-                            norm.transform.g = NULL, norm.tranform.h = NULL) {
+                            norm.transform.g = NULL, norm.transform.h = NULL) {
   
   size <- betabin.size
   g <- norm.transform.g
-  h <- norm.tranform.h
+  h <- norm.transform.h
+  
+  if (length(group.levels) != 2L ||
+      anyNA(group.levels) ||
+      anyDuplicated(as.character(group.levels))) {
+    stop("'group.levels' must contain two distinct, nonmissing labels.")
+  }
+  group.levels <- as.character(group.levels)
 
   if (identical(distribution, "normal")) distribution <- "norm"
   distribution <- tolower(match.arg(distribution))
@@ -1517,7 +1526,7 @@ gendat.hct.test <- function(mu1, mu2, sd1, sd2, n1, n2,
   use.gh <- !is.null(g) || !is.null(h)
   if (use.gh) {
     if (distribution != "norm") {
-      stop("'norm.transform.g' and 'norm.tranform.h' are available only with distribution = 'norm' (or 'normal').",
+      stop("'norm.transform.g' and 'norm.transform.h' are available only with distribution = 'norm' (or 'normal').",
            call. = FALSE)
     }
     shape <- function(value, name) {
@@ -1530,8 +1539,8 @@ gendat.hct.test <- function(mu1, mu2, sd1, sd2, n1, n2,
       rep(value, length.out = 2L)
     }
     g <- shape(g, "norm.transform.g")
-    h <- shape(h, "norm.tranform.h")
-    if (any(h < 0)) stop("'norm.tranform.h' must be nonnegative.", call. = FALSE)
+    h <- shape(h, "norm.transform.h")
+    if (any(h < 0)) stop("'norm.transform.h' must be nonnegative.", call. = FALSE)
     if (any(!is.finite(c(n1, n2))) || any(c(n1, n2) < 2) ||
         any(c(n1, n2) != floor(c(n1, n2)))) {
       stop("g-and-h generation requires integer group sample sizes of at least two.",
@@ -1547,8 +1556,8 @@ gendat.hct.test <- function(mu1, mu2, sd1, sd2, n1, n2,
     
   } else if(distribution == "mixture-normal" || distribution == "mixnorm" || distribution == "mnorm") {
     
-    y1 <- rmixnormal(n = n1, mu = mu1, sigma = sd1, weight = wt)
-    y2 <- rmixnormal(n = n2, mu = mu2, sigma = sd2, weight = wt)
+    y1 <- rmixnormal(n = n1, mu = mu1, sigma = sd1, weight = mixnorm.weights)
+    y2 <- rmixnormal(n = n2, mu = mu2, sigma = sd2, weight = mixnorm.weights)
     
   } else if(distribution == "negbin" || distribution == "nb") {
     
@@ -1601,17 +1610,38 @@ gendat.hct.test <- function(mu1, mu2, sd1, sd2, n1, n2,
     y1 <- norm.gh(y1, g = g[1], h = h[1], rescale = TRUE)
     y2 <- norm.gh(y2, g = g[2], h = h[2], rescale = TRUE)
   }
-  
-  if(fmt == "list.y") {
+  if (fmt == "list.y") {
+    
     return(list(y1 = y1, y2 = y2))
+    
   } else {
-    x1 <- rep(1, n1)
-    x2 <- rep(0, n2)
-    if(fmt == "list.yx") {
-      return(list(y1 = y1, y2 = y2, x1 = x1, x2 = x2))
-    } else {
-      return(data.frame(y = c(y1, y2), x = c(x1, x2)))
+    
+    if (length(group.levels) != 2L ||
+        anyNA(group.levels) ||
+        anyDuplicated(as.character(group.levels))) {
+      stop("'group.levels' must contain two distinct, nonmissing labels.")
     }
+    
+    group.levels <- as.character(group.levels)
+    
+    x1 <- factor(rep(group.levels[1], n1), levels = group.levels)
+    x2 <- factor(rep(group.levels[2], n2), levels = group.levels)
+    
+    if (fmt == "list.yx") {
+      
+      return(list(y1 = y1, y2 = y2, x1 = x1, x2 = x2))
+      
+    } else {
+      
+      return(data.frame(
+        y = c(y1, y2),
+        x = factor(
+          c(rep(group.levels[1], n1), rep(group.levels[2], n2)),
+          levels = group.levels
+        )
+      ))
+    }
+    
   }
   
 } # gendat.hct.test

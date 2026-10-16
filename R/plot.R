@@ -142,12 +142,20 @@
 #' @export
 plot.hctplot <- function(x, margins = NULL, reference = "auto", labels = NULL,
                          xlim = NULL, xlab = NULL, main = NULL,
+                         legend.labels = NULL, legend.position = "topright",
                          col = c("#001F3F", "#B35400"), pch = 19, cex = 1,
                          ci.lwd = 1.5, cap = 0.08, label.padding = 1,
                          pretty = FALSE, pretty.height = 0.18, pretty.lwd = 3, ...) {
   series <- if (".series" %in% names(x)) x$.series else rep(1L, nrow(x))
   row <- if (".row" %in% names(x)) x$.row else seq_len(nrow(x))
   n.series <- max(series)
+  if (!is.null(legend.labels)) {
+    if (!is.character(legend.labels) ||
+        length(legend.labels) != n.series ||
+        anyNA(legend.labels)) {
+      stop("Supply one nonmissing legend label per analysis object.")
+    }
+  }
   pooled <- attr(x, "pooled")
   n.pooled <- if (is.null(pooled)) 0L else nrow(pooled)
   pooled.labels <- if (n.pooled) if (n.series == 1L) "Pooled" else
@@ -234,7 +242,22 @@ plot.hctplot <- function(x, margins = NULL, reference = "auto", labels = NULL,
                  xaxs = "i", yaxs = "i", yaxt = "n", ylab = "", bty = "n",
                  xlab = "", main = main, ...)
   graphics::mtext(xlab, side = 1, line = xlab.line)
-  if (has.labels) graphics::axis(2, at = rev(seq_len(max(row))), labels = axis.labels, tick = FALSE, cex.axis = cex)
+  if (has.labels) {
+    separate.labels <- n.series == 2L &&
+      any(x$label[series == 1L] != x$label[series == 2L])
+    
+    if (separate.labels) {
+      graphics::axis(
+        2, at = y, labels = x$label,
+        tick = FALSE, cex.axis = cex, gap.axis = -1
+      )
+    } else {
+      graphics::axis(
+        2, at = rev(seq_len(max(row))), labels = axis.labels,
+        tick = FALSE, cex.axis = cex
+      )
+    }
+  }
   if (pretty) {
     for (i in seq_len(nrow(x)))
       .draw_hct_ribbon(x$estimate[i], x$lower.inner[i], x$upper.inner[i],
@@ -272,6 +295,16 @@ plot.hctplot <- function(x, margins = NULL, reference = "auto", labels = NULL,
   if (length(margins)) graphics::abline(v = margins, col = "red", lty = 2, lwd = 1.5)
   if (n.pooled) attr(x, "pooled") <- .draw_hct_pooled(pooled, pooled.labels, pooled.lines,
       xlim, col, pretty, pretty.height, pretty.lwd, ci.lwd, pch, cex)
+  if (!is.null(legend.labels)) {
+    graphics::legend(
+      x = legend.position,
+      legend = legend.labels,
+      col = col[seq_len(n.series)],
+      pch = rep_len(pch, n.series),
+      bty = "n",
+      cex = cex
+    )
+  }
   x$.y <- y
   attr(x, "reference.drawn") <- reference
   attr(x, "xlim") <- xlim
@@ -279,64 +312,126 @@ plot.hctplot <- function(x, margins = NULL, reference = "auto", labels = NULL,
 }
 
 # Convenient entry point for every existing output type.
-.hctplot <- function(x, y = NULL, effect = NULL,
-                     boot.ci = c("percentile", "bca"), labels = NULL, ...) {
-  first <- .as_hctplot(x, effect = effect, boot.ci = boot.ci)
+.hctplot <- function(
+    x, y = NULL, effect = NULL,
+    boot.ci = c("percentile", "bca"),
+    labels = NULL, ...
+) {
+  first <- .as_hctplot(
+    x, effect = effect, boot.ci = boot.ci
+  )
+  
   if (is.null(y)) {
-    if (is.list(labels)) stop("For one object, labels must be a character vector.")
+    if (is.list(labels))
+      stop("For one object, labels must be a character vector.")
+    
     if (!is.null(labels)) {
       if (length(labels) != nrow(first) || anyNA(labels))
         stop("Supply one nonmissing label per row.")
+      
       first$label <- as.character(labels)
     }
+    
     first$.series <- 1L
     first$.row <- seq_len(nrow(first))
+    
     return(plot(first, ...))
   }
-  second <- .as_hctplot(y, effect = attr(first, "effect"), boot.ci = boot.ci)
-  if (nrow(first) != nrow(second)) stop("The two objects must have the same number of rows.")
+  
+  second <- .as_hctplot(
+    y, effect = attr(first, "effect"), boot.ci = boot.ci
+  )
+  
+  if (nrow(first) != nrow(second))
+    stop("The two objects must have the same number of rows.")
+  
   if (is.list(labels)) {
-    if (length(labels) != 2L || any(lengths(labels) != nrow(first)) ||
-        anyNA(labels[[1]]) || anyNA(labels[[2]]))
+    if (length(labels) != 2L ||
+        any(lengths(labels) != nrow(first)) ||
+        anyNA(labels[[1]]) ||
+        anyNA(labels[[2]])) {
       stop("A labels list must contain one complete label vector per object.")
+    }
+    
+    # Explicit label lists pair rows by position.
     first$label <- as.character(labels[[1]])
     second$label <- as.character(labels[[2]])
+    
   } else {
-    kind <- function(z) if (is.data.frame(z) && "outcome" %in% names(z)) "outcome" else
-      if (is.data.frame(z) && "study" %in% names(z)) "study" else "single"
+    kind <- function(z) {
+      if (is.data.frame(z) && "outcome" %in% names(z)) {
+        "outcome"
+      } else if (is.data.frame(z) && "study" %in% names(z)) {
+        "study"
+      } else {
+        "single"
+      }
+    }
+    
     if (kind(x) != kind(y))
       stop("Match two study tables or two outcome tables, or supply labels as a list.")
+    
+    keys1 <- first$label
+    keys2 <- second$label
+    
+    if (anyDuplicated(keys1) || anyDuplicated(keys2))
+      stop("Study/outcome identifiers must be unique.")
+    
+    if (!setequal(keys1, keys2))
+      stop("The two objects must have matching study/outcome names.")
+    
+    second <- second[match(keys1, keys2), , drop = FALSE]
+    
+    if (!is.null(labels)) {
+      if (length(labels) != nrow(first) || anyNA(labels))
+        stop("Supply one nonmissing label per matched row.")
+      
+      first$label <- second$label <- as.character(labels)
+    }
   }
-  keys1 <- first$label
-  keys2 <- second$label
-  if (nrow(first) > 1L && (any(!nzchar(keys1)) || any(!nzchar(keys2))))
-    stop("Every compared row needs a nonempty identifier.")
-  if (anyDuplicated(keys1) || anyDuplicated(keys2))
-    stop("Identifiers must be unique for two-object plots; supply unique labels as a list.")
-  if (!setequal(keys1, keys2))
-    stop("The two objects must have the same study/outcome names or matching custom labels.")
-  second <- second[match(keys1, keys2), , drop = FALSE]
-  if (!is.null(labels) && !is.list(labels)) {
-    if (length(labels) != nrow(first) || anyNA(labels))
-      stop("Supply one nonmissing label per matched row.")
-    first$label <- second$label <- as.character(labels)
-  }
+  
   first$.series <- 1L
   second$.series <- 2L
   first$.row <- second$.row <- seq_len(nrow(first))
-  combined <- rbind(as.data.frame(first), as.data.frame(second))
+  
+  combined <- rbind(
+    as.data.frame(first),
+    as.data.frame(second)
+  )
+  
   pooled.first <- attr(first, "pooled")
   pooled.second <- attr(second, "pooled")
-  if (!is.null(pooled.second)) pooled.second$.series <- 2L
-  attr(combined, "pooled") <- if (is.null(pooled.first)) pooled.second else
-    if (is.null(pooled.second)) pooled.first else rbind(pooled.first, pooled.second)
-  attr(combined, "reference") <- c(attr(first, "reference"), attr(second, "reference"))
-  attr(combined, "reference.series") <- c(rep(1L, length(attr(first, "reference"))),
-                                            rep(2L, length(attr(second, "reference"))))
-  attr(combined, "reference.colored") <- isTRUE(attr(first, "reference.colored")) &&
+  
+  if (!is.null(pooled.second))
+    pooled.second$.series <- 2L
+  
+  attr(combined, "pooled") <-
+    if (is.null(pooled.first)) {
+      pooled.second
+    } else if (is.null(pooled.second)) {
+      pooled.first
+    } else {
+      rbind(pooled.first, pooled.second)
+    }
+  
+  attr(combined, "reference") <- c(
+    attr(first, "reference"),
+    attr(second, "reference")
+  )
+  
+  attr(combined, "reference.series") <- c(
+    rep(1L, length(attr(first, "reference"))),
+    rep(2L, length(attr(second, "reference")))
+  )
+  
+  attr(combined, "reference.colored") <-
+    isTRUE(attr(first, "reference.colored")) &&
     isTRUE(attr(second, "reference.colored"))
+  
   attr(combined, "effect") <- attr(first, "effect")
   class(combined) <- c("hctplot", "data.frame")
+  
+  # Forward pretty, margins, legend settings, colors, etc.
   plot(combined, ...)
 }
 
@@ -412,10 +507,12 @@ plot.hctplot <- function(x, margins = NULL, reference = "auto", labels = NULL,
 plot.hct.test <- function(x, y = NULL, effect = NULL, boot.ci = c("percentile", "bca"),
                           margins = NULL, reference = "auto", labels = NULL,
                           xlim = NULL, xlab = NULL, main = NULL,
+                          legend.labels = NULL, legend.position = "topright",
                           col = c("#001F3F", "#B35400"), pch = 19, cex = 1,
                           ci.lwd = 1.5, cap = 0.08, label.padding = 1,
                           pretty = FALSE, pretty.height = 0.18, pretty.lwd = 3, ...) {
   .hctplot(x, y = y, effect = effect, boot.ci = boot.ci, labels = labels,
+           legend.labels = legend.labels, legend.position = legend.position,
             margins = margins, reference = reference, xlim = xlim,
             xlab = xlab, main = main, col = col, pch = pch, cex = cex,
             ci.lwd = ci.lwd, cap = cap, label.padding = label.padding,

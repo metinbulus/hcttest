@@ -25,6 +25,12 @@
   y <- graphics::grconvertY(bottom - lines * line.height, "inches", "user")
   half <- abs(graphics::grconvertY(bottom + pretty.height * line.height, "inches", "user") -
                 graphics::grconvertY(bottom, "inches", "user"))
+  old.xpd <- graphics::par("xpd")
+  old.usr <- graphics::par("usr")
+  on.exit({
+    graphics::par(xpd = old.xpd)
+    graphics::clip(old.usr[1], old.usr[2], old.usr[3], old.usr[4])
+  }, add = TRUE)
   graphics::par(xpd = NA)
   graphics::text(xlim[1], y, labels = labels, pos = 2, cex = cex, col = col[pooled$.series])
   for (i in seq_len(nrow(pooled))) {

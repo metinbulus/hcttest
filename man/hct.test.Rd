@@ -25,10 +25,10 @@
   na.rm = FALSE,
   weights = NULL,
   distribution = c("norm", "norm"),
-  mixnorm.weight = 0.5,
+  mixnorm.weights = 0.5,
   betabin.size = 20,
   norm.transform.g = NULL,
-  norm.tranform.h = NULL,
+  norm.transform.h = NULL,
   verbose = TRUE,
   ...
 )
@@ -64,11 +64,11 @@ hct.test(x, ...)
 
 \item{distribution}{Two group distributions used for trimmed summary-data calculations.}
 
-\item{mixnorm.weight}{Mixture-component proportions for summary-data distributions; distinct from observation weights.}
+\item{mixnorm.weights}{Mixture-component proportions for summary-data distributions; distinct from observation weights.}
 
 \item{betabin.size}{Size parameter for beta-binomial summary distributions.}
 
-\item{norm.transform.g, norm.tranform.h}{Optional g-and-h parameters for summary-data moment calculations.}
+\item{norm.transform.g, norm.transform.h}{Optional g-and-h parameters for summary-data moment calculations.}
 
 \item{verbose}{Logical; print results.}
 
